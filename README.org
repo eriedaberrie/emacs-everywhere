@@ -9,7 +9,7 @@
 #+html: <img src="https://img.shields.io/badge/-MacOS-lightgrey?logo=apple&style=flat-square&logoColor=black">
 #+html: <a href="https://liberapay.com/tec"><img src="https://shields.io/badge/support%20my%20efforts-f6c915?logo=Liberapay&style=flat-square&logoColor=black"></a></p>
 
-A re-implementation of the fantastic idea in [[https://github.com/zachcurry/emacs-anywhere][zachcurry/emacs-anywhere]].
+A re-implementation of the fantastic idea in [[https://github.com/zachcurry/emacs-anywhere][zachcurry/emacs-anywhere]] (forked for Hyprland support).
 
 [[https://user-images.githubusercontent.com/20903656/107152385-814f2c00-69a2-11eb-978f-b3e78067b3f3.gif]]
 
@@ -23,7 +23,9 @@ Available with the =:app everywhere= module (and with a nice modeline).
 
 ** Dependencies
 
-On Linux, ensure you have the following dependencies satisfied: =xclip=, =xdotool=, =xprop=, and =xwininfo=.
+On Hyprland, ensure you have the following dependencies satisfied: =wl-clipboard=
+and =ydotool= (optional, for pasting). X11 users will need =xclip=, =xdotool=, =xprop=,
+and =xwininfo=.
 
 * Usage
 

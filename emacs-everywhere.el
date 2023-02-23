@@ -3,12 +3,12 @@
 ;; Copyright (C) 2021 TEC
 
 ;; Author: TEC <https://github.com/tecosaur>
-;; Maintainer: TEC <contact@tecosaur.net>
+;; Maintainer: eriedaberrie <eriedaberrie@gmail.com>
 ;; Created: February 06, 2021
 ;; Modified: February 06, 2021
 ;; Version: 0.1.0
-;; Keywords: conenience, frames
-;; Homepage: https://github.com/tecosaur/emacs-everywhere
+;; Keywords: convenience, frames
+;; Homepage: https://github.com/eriedaberrie/emacs-everywhere
 ;; Package-Requires: ((emacs "26.3"))
 
 ;;; License:
@@ -41,14 +41,23 @@
    (t 'unknown))
   "The detected display server.")
 
+(defvar emacs-everywhere--wayland-compositor
+  (when (eq emacs-everywhere--display-server 'wayland)
+    (pcase (getenv "XDG_CURRENT_DESKTOP")
+      ("Hyprland" 'hyprland)
+      (_ 'unknown)))
+  "The detected Wayland compositor, if applicable.")
+
 (defcustom emacs-everywhere-paste-command
   (pcase emacs-everywhere--display-server
     ('quartz (list "osascript" "-e" "tell application \"System Events\" to keystroke \"v\" using command down"))
     ('x11 (list "xdotool" "key" "--clearmodifiers" "Shift+Insert"))
     ((or 'wayland 'unknown)
-     (list "notify-send"
-           "No paste command defined for emacs-everywhere"
-           "-a" "Emacs" "-i" "emacs")))
+     (if (executable-find "ydotool")
+         (list "ydotool" "key" "42:1" "110:1" "110:0" "42:0")
+       (list "notify-send"
+             "No paste command defined for emacs-everywhere"
+             "-a" "Emacs" "-i" "emacs"))))
   "Command to trigger a system paste from the clipboard.
 This is given as a list in the form (CMD ARGS...).
 
@@ -77,7 +86,9 @@ it worked can be a good idea."
 (defcustom emacs-everywhere-window-focus-command
   (pcase emacs-everywhere--display-server
     ('quartz (list "osascript" "-e" "tell application \"%w\" to activate"))
-    ('x11 (list "xdotool" "windowactivate" "--sync" "%w")))
+    ('x11 (list "xdotool" "windowactivate" "--sync" "%w"))
+    ((and 'wayland (guard (eq emacs-everywhere--wayland-compositor 'hyprland)))
+     (list "hyprctl" "dispatch" "focuswindow" "address:%w")))
   "Command to refocus the active window when emacs-everywhere was triggered.
 This is given as a list in the form (CMD ARGS...).
 In the arguments, \"%w\" is treated as a placeholder for the window ID,
@@ -351,9 +362,11 @@ Never paste content when ABORT is non-nil."
 
 (defun emacs-everywhere-app-info ()
   "Return information on the active window."
-  (let ((w (pcase system-type
-             (`darwin (emacs-everywhere-app-info-osx))
-             (_ (emacs-everywhere-app-info-linux)))))
+  (let ((w (pcase emacs-everywhere--display-server
+             ('quartz (emacs-everywhere-app-info-osx))
+             ('x11 (emacs-everywhere-app-info-x11))
+             ('wayland (pcase emacs-everywhere--wayland-compositor
+                         ('hyprland (emacs-everywhere-app-info-hyprland)))))))
     (setf (emacs-everywhere-app-title w)
           (replace-regexp-in-string
            (format " ?-[A-Za-z0-9 ]*%s"
@@ -375,8 +388,17 @@ Please go to 'System Preferences > Security & Privacy > Privacy > Accessibility'
       (error "MacOS accessibility error, aborting."))
     (string-trim (buffer-string))))
 
-(defun emacs-everywhere-app-info-linux ()
-  "Return information on the active window, on linux."
+(defun emacs-everywhere-hyprctl-json (command &rest args)
+  "Pass COMMAND with ARGS to hyprctl synchronously, and return the result as JSON."
+  (require 'json)
+  (json-parse-string (apply #'emacs-everywhere-call "hyprctl" "-j" command args)
+                     :object-type 'plist
+                     :array-type 'list
+                     :null-object nil
+                     :false-object nil))
+
+(defun emacs-everywhere-app-info-x11 ()
+  "Return information on the active window, on X11."
   (let ((window-id (emacs-everywhere-call "xdotool" "getactivewindow")))
     (let ((app-name
            (car (split-string-and-unquote
@@ -413,6 +435,14 @@ Please go to 'System Preferences > Security & Privacy > Privacy > Accessibility'
                     (- (nth 1 window-geometry) (nth 3 window-geometry)))
                   (nth 4 window-geometry)
                   (nth 5 window-geometry))))))
+
+(defun emacs-everywhere-app-info-hyprland ()
+  (let ((window (emacs-everywhere-hyprctl-json "activewindow")))
+    (make-emacs-everywhere-app
+     :id (plist-get window :address)
+     :class (plist-get window :class)
+     :title (plist-get window :title)
+     :geometry (append (plist-get window :at) (plist-get window :size)))))
 
 (defvar emacs-everywhere--dir (file-name-directory load-file-name))
 
