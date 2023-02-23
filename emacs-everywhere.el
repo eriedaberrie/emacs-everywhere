@@ -437,6 +437,7 @@ Please go to 'System Preferences > Security & Privacy > Privacy > Accessibility'
                   (nth 5 window-geometry))))))
 
 (defun emacs-everywhere-app-info-hyprland ()
+  "Return information on the active window, on Hyprland."
   (let ((window (emacs-everywhere-hyprctl-json "activewindow")))
     (make-emacs-everywhere-app
      :id (plist-get window :address)
