@@ -390,7 +390,6 @@ Please go to 'System Preferences > Security & Privacy > Privacy > Accessibility'
 
 (defun emacs-everywhere-hyprctl-json (command &rest args)
   "Pass COMMAND with ARGS to hyprctl synchronously, and return the result as JSON."
-  (require 'json)
   (json-parse-string (apply #'emacs-everywhere-call "hyprctl" "-j" command args)
                      :object-type 'plist
                      :array-type 'list
